@@ -15,11 +15,11 @@ import (
 )
 
 var (
-	minlen  uint
-	nodesep float64
+	minlen    uint
+	nodesep   float64
 	nodeshape string
 	nodestyle string
-	rankdir string
+	rankdir   string
 )
 
 // location of dot executable for converting from .dot to .svg
@@ -112,7 +112,7 @@ const tmplGraph = `digraph gocallvis {
     pad="0.0";
     nodesep="{{.Options.nodesep}}";
 
-    node [shape="{{.Options.nodeshape}}" style="{{.Options.nodestyle}}" fillcolor="honeydew" fontname="Verdana" penwidth="1.0" margin="0.05,0.0"];
+    node [shape="{{.Options.nodeshape}}" style="{{.Options.nodestyle}}" fillcolor="honeydew" fontname="Verdana" penwidth="1.0" margin="0.35,0.0"];
     edge [minlen="{{.Options.minlen}}"]
 
     {{template "cluster" .Cluster}}

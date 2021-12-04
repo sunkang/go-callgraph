@@ -36,8 +36,8 @@ var (
 	limitFlag    = flag.String("limit", "", "Limit package paths to given prefixes (separated by comma)")
 	ignoreFlag   = flag.String("ignore", "", "Ignore package paths containing given prefixes (separated by comma)")
 	includeFlag  = flag.String("include", "", "Include package paths with given prefixes (separated by comma)")
-	nostdFlag    = flag.Bool("nostd", false, "Omit calls to/from packages in standard library.")
-	nointerFlag  = flag.Bool("nointer", false, "Omit calls to unexported functions.")
+	nostdFlag    = flag.Bool("nostd", true, "Omit calls to/from packages in standard library.")
+	nointerFlag  = flag.Bool("nointer", true, "Omit calls to unexported functions.")
 	testFlag     = flag.Bool("tests", false, "Include test code.")
 	graphvizFlag = flag.Bool("graphviz", false, "Use Graphviz's dot program to render images.")
 	httpFlag     = flag.String("http", ":7878", "HTTP service address.")
@@ -46,7 +46,7 @@ var (
 	outputFormat = flag.String("format", "svg", "output file format [svg | png | jpg | ...]")
 	cacheDir     = flag.String("cacheDir", "", "Enable caching to avoid unnecessary re-rendering, you can force rendering by adding 'refresh=true' to the URL query or emptying the cache directory")
 
-	debugFlag   = flag.Bool("debug", false, "Enable verbose log.")
+	debugFlag   = flag.Bool("debug", true, "Enable verbose log.")
 	versionFlag = flag.Bool("version", false, "Show version and exit.")
 )
 
@@ -140,7 +140,7 @@ func main() {
 	urlAddr := parseHTTPAddr(httpAddr)
 
 	Analysis = new(analysis)
-	if err := Analysis.DoAnalysis("", tests, args); err != nil {
+	if err := Analysis.DoAnalysis("./", tests, args); err != nil {
 		log.Fatal(err)
 	}
 

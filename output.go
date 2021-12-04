@@ -139,16 +139,68 @@ func printOutput(
 		return false
 	}
 
+	graphVisitEdges := func(g *callgraph.Graph, edge func(*callgraph.Edge, bool, int) error) error {
+		seen := make(map[*callgraph.Node]bool)
+		var visit func(n *callgraph.Node, mainleg bool, deep int, path string) error
+		visit = func(n *callgraph.Node, mainleg bool, deep int, path string) error {
+			if !seen[n] {
+				seen[n] = true
+				for _, e := range n.Out {
+					isMainFunc := mainleg
+					if !mainleg {
+						isMainFunc = strings.Contains(e.Caller.String(), ".main")
+					}
+					if len(path) == 0 {
+						path = e.Caller.Func.Name()
+					}
+					if !isMainFunc {
+						isMainFunc = strings.Contains(path, "main")
+					}
+					if !isMainFunc {
+						continue
+					}
+					if err := visit(e.Callee, isMainFunc, deep+1, path); err != nil {
+						return err
+					}
+					if err := edge(e, isMainFunc, deep); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+		for _, n := range g.Nodes {
+			if err := visit(n, false, 0, ""); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	omitNames := []string{"golang.org/x/net", ".printOutput", "Error", "*net.", "*sync", ":log.",
+		":net.", "grpclog", ".Err)", ".Log", "grpcrand", "status.Status", "grpcsync.Event",
+		"binarylog"}
+	checkOmitNames := func(s string) bool {
+		for _, v := range omitNames {
+			if strings.Contains(s, v) {
+				return true
+			}
+		}
+		return false
+	}
+
 	count := 0
-	err := callgraph.GraphVisitEdges(cg, func(edge *callgraph.Edge) error {
+	err := graphVisitEdges(cg, func(edge *callgraph.Edge, mainleg bool, deep int) error {
 		count++
+		if checkOmitNames(edge.Callee.String()) {
+			return nil
+		}
 
 		caller := edge.Caller
 		callee := edge.Callee
 
 		posCaller := prog.Fset.Position(caller.Func.Pos())
 		posCallee := prog.Fset.Position(callee.Func.Pos())
-		posEdge   := prog.Fset.Position(edge.Pos())
+		posEdge := prog.Fset.Position(edge.Pos())
 		//fileCaller := fmt.Sprintf("%s:%d", posCaller.Filename, posCaller.Line)
 		filenameCaller := filepath.Base(posCaller.Filename)
 
@@ -171,9 +223,13 @@ func printOutput(
 			(inStd(caller) || inStd(callee)) {
 			return nil
 		}
+		isCustomfile := strings.Contains(caller.Func.Pkg.String(), "go-callvis")
+		if !isCustomfile {
+			isCustomfile = strings.Contains(caller.Func.Pkg.String(), "main")
+		}
 
 		// omit inter
-		if nointer && isInter(edge) {
+		if nointer && isInter(edge) && !isCustomfile {
 			return nil
 		}
 
@@ -208,11 +264,11 @@ func printOutput(
 
 		var sprintNode = func(node *callgraph.Node, isCaller bool) *dotNode {
 			// only once
-			key         := node.Func.String()
+			key := node.Func.String()
 			nodeTooltip := ""
 
-			fileCaller  := fmt.Sprintf("%s:%d", filepath.Base(posCaller.Filename), posCaller.Line)
-			fileCallee  := fmt.Sprintf("%s:%d", filepath.Base(posCallee.Filename), posCallee.Line)
+			fileCaller := fmt.Sprintf("%s:%d", filepath.Base(posCaller.Filename), posCaller.Line)
+			fileCallee := fmt.Sprintf("%s:%d", filepath.Base(posCallee.Filename), posCallee.Line)
 
 			if isCaller {
 				nodeTooltip = fmt.Sprintf("%s | defined in %s", node.Func.String(), fileCaller)
@@ -383,6 +439,11 @@ func printOutput(
 		key := fmt.Sprintf("%s = %s => %s", caller.Func, edge.Description(), callee.Func)
 		if _, ok := edgeMap[key]; !ok {
 			attrs["tooltip"] = fileEdge
+			attrs["label"] = fmt.Sprintf(
+				"[%d]%s",
+				posEdge.Line,
+				edge.Caller.Func.Name(),
+			)
 			e := &dotEdge{
 				From:  callerNode,
 				To:    calleeNode,
@@ -427,11 +488,11 @@ func printOutput(
 		Nodes:   nodes,
 		Edges:   edges,
 		Options: map[string]string{
-			"minlen":  fmt.Sprint(minlen),
-			"nodesep": fmt.Sprint(nodesep),
+			"minlen":    fmt.Sprint(minlen),
+			"nodesep":   fmt.Sprint(nodesep),
 			"nodeshape": fmt.Sprint(nodeshape),
 			"nodestyle": fmt.Sprint(nodestyle),
-			"rankdir": fmt.Sprint(rankdir),
+			"rankdir":   fmt.Sprint(rankdir),
 		},
 	}
 

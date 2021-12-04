@@ -50,7 +50,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("converting dot to %s..\n", *outputFormat)
 
-	img, err = dotToImage("", *outputFormat, output)
+	img, err = dotToImage("./go-callvis_export", *outputFormat, output)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -65,4 +65,3 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("serving file:", img)
 	http.ServeFile(w, r, img)
 }
-
