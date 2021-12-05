@@ -138,6 +138,7 @@ func printOutput(
 		}
 		return false
 	}
+	rootName := htmlOpts.RootFunc //"processUnaryRPC"
 
 	graphVisitEdges := func(g *callgraph.Graph, edge func(*callgraph.Edge, bool, int) error) error {
 		seen := make(map[*callgraph.Node]bool)
@@ -148,13 +149,13 @@ func printOutput(
 				for _, e := range n.Out {
 					isMainFunc := mainleg
 					if !mainleg {
-						isMainFunc = strings.Contains(e.Caller.String(), ".main")
+						isMainFunc = strings.Contains(e.Caller.String(), "."+rootName)
 					}
 					if len(path) == 0 {
 						path = e.Caller.Func.Name()
 					}
 					if !isMainFunc {
-						isMainFunc = strings.Contains(path, "main")
+						isMainFunc = strings.Contains(path, rootName)
 					}
 					if !isMainFunc {
 						continue
@@ -176,9 +177,7 @@ func printOutput(
 		}
 		return nil
 	}
-	omitNames := []string{"golang.org/x/net", ".printOutput", "Error", "*net.", "*sync", ":log.",
-		":net.", "grpclog", ".Err)", ".Log", "grpcrand", "status.Status", "grpcsync.Event",
-		"binarylog"}
+	omitNames := htmlOpts.OmitNames
 	checkOmitNames := func(s string) bool {
 		for _, v := range omitNames {
 			if strings.Contains(s, v) {
@@ -345,7 +344,7 @@ func printOutput(
 							"label":     label,
 							"style":     "filled",
 							"fillcolor": "lightyellow",
-							"URL":       fmt.Sprintf("/?f=%s", key),
+							"URL":       fmt.Sprintf("/module?f=%s", key),
 							"fontname":  "Tahoma bold",
 							"tooltip":   fmt.Sprintf("package: %s", key),
 							"rank":      "sink",

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/build"
@@ -30,6 +31,18 @@ type renderOpts struct {
 	refresh  bool
 	nostd    bool
 }
+
+type HtmlOpts struct {
+	Focus     string
+	Group     []string
+	Limit     []string
+	Inter     bool
+	Refresh   bool
+	RootFunc  string
+	OmitNames []string
+}
+
+var htmlOpts *HtmlOpts
 
 // mainPackages returns the main packages to analyze.
 // Each resulting package is named "main" and has a main function.
@@ -63,9 +76,9 @@ func (a *analysis) DoAnalysis(
 	args []string,
 ) error {
 	cfg := &packages.Config{
-		Mode:  packages.LoadAllSyntax,
-		Tests: tests,
-		Dir:   dir,
+		Mode:       packages.LoadAllSyntax,
+		Tests:      tests,
+		Dir:        dir,
 		BuildFlags: build.Default.BuildTags,
 	}
 
@@ -98,9 +111,9 @@ func (a *analysis) DoAnalysis(
 	}
 	//cg.DeleteSyntheticNodes()
 
-	a.prog   = prog
-	a.pkgs   = pkgs
-	a.mains  = mains
+	a.prog = prog
+	a.pkgs = pkgs
+	a.mains = mains
 	a.result = result
 	return nil
 }
@@ -116,13 +129,40 @@ func (a *analysis) OptsSetup() {
 		nointer:  *nointerFlag,
 		nostd:    *nostdFlag,
 	}
+	htmlOpts = &HtmlOpts{
+		Focus:    a.opts.focus,
+		Group:    a.opts.group,
+		Limit:    a.opts.limit,
+		Inter:    a.opts.nointer,
+		Refresh:  a.opts.refresh,
+		RootFunc: "main",
+		OmitNames: []string{"golang.org/x/net", ".printOutput", "Error", "*net.", "*sync", ":log.",
+			":net.", "grpclog", ".Err)", ".Log", "grpcrand", "status.Status", "grpcsync.Event",
+			"binarylog"},
+	}
+}
+
+func (a *analysis) GetOptMarshal() string {
+	b, err := json.Marshal(*htmlOpts)
+	if err != nil {
+		logf(err.Error())
+	}
+	return string(b)
+}
+
+func (a *analysis) UpdateOptUnMarshal(s string) {
+	opts := new(HtmlOpts)
+	err := json.Unmarshal([]byte(s), opts)
+	if err != nil {
+		logf(err.Error())
+	}
 }
 
 func (a *analysis) ProcessListArgs() (e error) {
-	var groupBy      []string
-	var ignorePaths  []string
+	var groupBy []string
+	var ignorePaths []string
 	var includePaths []string
-	var limitPaths   []string
+	var limitPaths []string
 
 	for _, g := range strings.Split(a.opts.group[0], ",") {
 		g := strings.TrimSpace(g)
@@ -165,7 +205,7 @@ func (a *analysis) ProcessListArgs() (e error) {
 	return
 }
 
-func (a *analysis) OverrideByHTTP(r *http.Request) () {
+func (a *analysis) OverrideByHTTP(r *http.Request) {
 	if f := r.FormValue("f"); f == "all" {
 		a.opts.focus = ""
 	} else if f != "" {
@@ -192,7 +232,6 @@ func (a *analysis) OverrideByHTTP(r *http.Request) () {
 	if inc := r.FormValue("include"); inc != "" {
 		a.opts.include[0] = inc
 	}
-	return
 }
 
 // basically do printOutput() with previously checking

@@ -108,6 +108,7 @@ const tmplGraph = `digraph gocallvis {
     rankdir="{{.Options.rankdir}}";
     bgcolor="lightgray";
     style="solid";
+	splines="line";
     penwidth="0.5";
     pad="0.0";
     nodesep="{{.Options.nodesep}}";

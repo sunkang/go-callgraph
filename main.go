@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/pkg/browser"
 	"golang.org/x/tools/go/buildutil"
 )
@@ -89,8 +90,6 @@ func openBrowser(url string) {
 }
 
 func outputDot(fname string, outputFormat string) {
-	// get cmdline default for analysis
-	Analysis.OptsSetup()
 
 	if e := Analysis.ProcessListArgs(); e != nil {
 		log.Fatalf("%v\n", e)
@@ -116,8 +115,38 @@ func outputDot(fname string, outputFormat string) {
 	}
 }
 
+func ginServer() {
+	r := gin.Default()
+	r.StaticFS("/root", http.Dir("./static"))
+	r.GET("/options", func(c *gin.Context) {
+		updateOpts := c.Request.FormValue("opts")
+		if len(updateOpts) > 0 {
+			logf(updateOpts)
+			Analysis.UpdateOptUnMarshal(updateOpts)
+		}
+		opts := Analysis.GetOptMarshal()
+		c.String(http.StatusOK, opts)
+	})
+	r.GET("/module", func(c *gin.Context) {
+
+		// get cmdline default for analysis
+		Analysis.OptsSetup()
+
+		//analysis.opts.focus = name
+		Analysis.OverrideByHTTP(c.Request)
+
+		go outputDot("./static/data/go-callvis_export", "dot")
+		//c.String(http.StatusOK, "/")
+		c.Redirect(http.StatusMovedPermanently, "http://localhost:8000/root/test.html")
+	})
+	//默认为监听8080端口
+	r.Run(":8000")
+}
+
 //noinspection GoUnhandledErrorResult
 func main() {
+	go ginServer()
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -136,13 +165,22 @@ func main() {
 
 	args := flag.Args()
 	tests := *testFlag
-	httpAddr := *httpFlag
-	urlAddr := parseHTTPAddr(httpAddr)
 
 	Analysis = new(analysis)
+	// get cmdline default for analysis
+	Analysis.OptsSetup()
+
 	if err := Analysis.DoAnalysis("./", tests, args); err != nil {
 		log.Fatal(err)
 	}
+
+	outputDot("./static/data/go-callvis_export", "dot")
+	time.Sleep(time.Hour)
+}
+
+func handleServer() {
+	httpAddr := *httpFlag
+	urlAddr := parseHTTPAddr(httpAddr)
 
 	http.HandleFunc("/", handler)
 
@@ -158,6 +196,9 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
+		// get cmdline default for analysis
+		Analysis.OptsSetup()
+
 		outputDot(*outputFile, *outputFormat)
 	}
 }
